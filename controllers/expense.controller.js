@@ -2,7 +2,7 @@ import { HTTPStatus } from "../constants/StatusCode.js";
 import JWT from "jsonwebtoken";
 import dotenv from "dotenv";
 import { Budget, Category, Expense, User } from "../configs/postgresql.js";
-import { Op } from "sequelize";
+import sequelize,{ Op } from "sequelize";
 import { sendVerificationMail } from "../utils/nodemailer.js";
 dotenv.config();
 
@@ -172,6 +172,37 @@ export const recurringPayment = async (req, res) => {
       { lastPay: currentDate },
       { where: { id: expenseId } }
     );
+  } catch (error) {
+    console.error(error);
+    res
+      .status(HTTPStatus.server_err)
+      .send({ success: false, message: "Server Error, Try Again" });
+  }
+};
+
+export const getExpensesByCategory = async (req,res) => {
+  try {
+    const { authorization } = req.headers;
+    const tokenDetails = JWT.verify(authorization, process.env.JWT_SECRET);
+    const expenses = await Expense.findAll({
+      attributes: [
+        "categoryId",
+        [sequelize.fn("SUM", sequelize.col("amount")), "totalAmount"],
+      ],
+      where: {
+        userId: tokenDetails.id,
+      },
+      group: ["Expense.categoryId", "category.id", "category.name"],
+      include: [
+        { model: Category, as: "category", attributes: [] } // Exclude unnecessary attributes
+      ],
+    });
+    let totalExpenses=[]
+    expenses.forEach((expense)=>{
+      totalExpenses.push(expense.dataValues)
+    })
+    console.log(totalExpenses);
+    res.status(HTTPStatus.success).send({success:true,message:"Fetch the expense by category",totalExpenses})
   } catch (error) {
     console.error(error);
     res
