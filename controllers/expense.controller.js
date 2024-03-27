@@ -28,7 +28,7 @@ export const getUserExpenses = async (req, res) => {
 
 export const createExpense = async (req, res) => {
   try {
-    const { label, amount, categoryId } = req.body;
+    const { label, amount, categoryId, isRecurring } = req.body;
     const { authorization } = req.headers;
     const tokenDetails = JWT.verify(authorization, process.env.JWT_SECRET);
     if (!label) {
@@ -56,15 +56,63 @@ export const createExpense = async (req, res) => {
         message: "Invalid category, Try Again",
       });
     }
-    await Expense.create({
-      label,
-      amount,
-      categoryId,
-      userId: tokenDetails.id,
-    });
+    let expense;
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
+    isRecurring
+      ? (expense = await Expense.create({
+          label,
+          amount,
+          categoryId,
+          userId: tokenDetails.id,
+          isRecurring,
+          lastPay:currentDate
+        }))
+      : (expense = await Expense.create({
+          label,
+          amount,
+          categoryId,
+          userId: tokenDetails.id,
+        }));
     res
       .status(HTTPStatus.success)
-      .send({ success: true, message: "Added new expense" });
+      .send({ success: true, message: "Added new expense", expense });
+  } catch (error) {
+    console.error(error);
+    res
+      .status(HTTPStatus.server_err)
+      .send({ success: false, message: "Server Error, Try Again" });
+  }
+};
+
+export const recurringPayment = async (req, res) => {
+  try {
+    const { expenseId } = req.body;
+    if (isNaN(expenseId)) {
+      return res.status(HTTPStatus.client_err).send({
+        success: false,
+        message: "Provdie a valid expense",
+      });
+    }
+    const expense = await Expense.findOne({ where: { id: expenseId } });
+    if (!expense) {
+      return res.status(HTTPStatus.client_err).send({
+        success: false,
+        message: "No such expense found, try again",
+      });
+    }
+    if (!expense.isRecurring) {
+      return res.status(HTTPStatus.client_err).send({
+        success: false,
+        message: "Provdie expense is not recurring",
+      });
+    }
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
+    await Expense.update(
+      { lastPay: currentDate },
+      { where: { id: expenseId } }
+    );
   } catch (error) {
     console.error(error);
     res

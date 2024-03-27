@@ -1,5 +1,5 @@
 import express from 'express'
-import { getUserBudgets, provideBudget } from '../controllers/budget.controller'
+import { getUserBudgets, provideBudget } from '../controllers/budget.controller.js'
 const budgetRouter=express.Router()
 
 budgetRouter.get('/all',(req,res)=>getUserBudgets(req,res))

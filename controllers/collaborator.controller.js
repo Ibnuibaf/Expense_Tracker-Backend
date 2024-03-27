@@ -1,13 +1,13 @@
 import { HTTPStatus } from "../constants/StatusCode.js";
 import JWT from "jsonwebtoken";
 import dotenv from "dotenv";
-import { Collaborator } from "../configs/postgresql.js";
+import { Collaborator, Expense, User } from "../configs/postgresql.js";
 dotenv.config();
 
 export const createCollab = async (req, res) => {
   try {
     const { expenseId, users } = req.body;
-    if (NaN(expenseId)) {
+    if (isNaN(expenseId)) {
       return res.status(HTTPStatus.client_err).send({
         success: false,
         message: "Provide a valid expense details to share",
@@ -38,8 +38,20 @@ export const getUsersCollabs = async (req, res) => {
   try {
     const { authorization } = req.headers;
     const tokenDetails = JWT.verify(authorization, process.env.JWT_SECRET);
-    const collaborations=await Collaborator.findAll({where:{userId:tokenDetails.id}})
-    res.status(HTTPStatus.success).send({success:true,message:"Fetch all collabs of user",collaborations})
+    const collaborations = await Collaborator.findAll({
+      where: { userId: tokenDetails.id },
+      include: [
+        { model: User, as: "user", attributes: ["email"] },
+        { model: Expense, as: "expense"},
+      ],
+    });
+    res
+      .status(HTTPStatus.success)
+      .send({
+        success: true,
+        message: "Fetch all collabs of user",
+        collaborations,
+      });
   } catch (error) {
     console.error(error);
     res

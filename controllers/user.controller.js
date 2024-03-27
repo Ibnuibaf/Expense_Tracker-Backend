@@ -8,6 +8,7 @@ import { HTTPStatus } from "../constants/StatusCode.js";
 import bcrypt from "bcrypt";
 import JWT from "jsonwebtoken";
 import dotenv from "dotenv";
+import { Op } from "sequelize";
 dotenv.config();
 
 export const getUser = async (req, res) => {
@@ -21,6 +22,19 @@ export const getUser = async (req, res) => {
     res
       .status(HTTPStatus.success)
       .send({ success: true, message: "UserDetails fetched", user });
+  } catch (error) {
+    console.error(error);
+    res
+      .status(HTTPStatus.server_err)
+      .send({ success: false, message: "Server Error, Try Again" });
+  }
+};
+
+export const getAllUsers = async(req, res) => {
+  try {
+    const {search}=req.query
+    const users=await User.findAll({where: { email: { [Op.iLike]: search } }})
+    res.status(HTTPStatus.success).send({success:true,message:"Fetch all users",users})
   } catch (error) {
     console.error(error);
     res
@@ -109,4 +123,3 @@ export const userLogin = async (req, res) => {
       .send({ success: false, message: "Server Error, Try Again" });
   }
 };
-
