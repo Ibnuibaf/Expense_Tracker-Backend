@@ -1,12 +1,14 @@
 import { HTTPStatus } from "../constants/StatusCode.js";
 import JWT from "jsonwebtoken";
 import dotenv from "dotenv";
-import { Collaborator, Expense, User } from "../configs/postgresql.js";
+import { Category, Collaborator, Expense, User } from "../configs/postgresql.js";
 dotenv.config();
 
 export const createCollab = async (req, res) => {
   try {
-    const { expenseId, users } = req.body;
+    const { expenseId, users, categoryId } = req.body;
+    const { authorization } = req.headers;
+    const tokenDetails = JWT.verify(authorization, process.env.JWT_SECRET);
     if (isNaN(expenseId)) {
       return res.status(HTTPStatus.client_err).send({
         success: false,
@@ -21,7 +23,7 @@ export const createCollab = async (req, res) => {
     }
 
     for (let i = 0; i < users.length; i++) {
-      await Collaborator.create({ userId: users[i], expenseId });
+      await Collaborator.create({ userId: users[i], expenseId, sharedBy:tokenDetails.id, categoryId });
     }
     res
       .status(HTTPStatus.success)
@@ -36,13 +38,22 @@ export const createCollab = async (req, res) => {
 
 export const getUsersCollabs = async (req, res) => {
   try {
+    const {category}=req.query
     const { authorization } = req.headers;
     const tokenDetails = JWT.verify(authorization, process.env.JWT_SECRET);
+    const whereClause = {
+      userId: tokenDetails.id,
+    };
+    if (category) {
+      whereClause.categoryId = category;
+    }
     const collaborations = await Collaborator.findAll({
-      where: { userId: tokenDetails.id },
+      where: whereClause,
       include: [
-        { model: User, as: "user", attributes: ["email"] },
         { model: Expense, as: "expense"},
+        { model: Category, as: "category", attributes: ["name"] },
+        { model: User, as: "user", attributes: ["email"], foreignKey: "userId" },
+        { model: User, as: "sharedUser", attributes: ["email"], foreignKey: "sharedBy" },
       ],
     });
     res

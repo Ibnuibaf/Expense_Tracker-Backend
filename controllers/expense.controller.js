@@ -1,20 +1,33 @@
 import { HTTPStatus } from "../constants/StatusCode.js";
 import JWT from "jsonwebtoken";
 import dotenv from "dotenv";
-import { Category, Expense, User } from "../configs/postgresql.js";
+import { Budget, Category, Expense, User } from "../configs/postgresql.js";
+import { Op } from "sequelize";
+import { sendVerificationMail } from "../utils/nodemailer.js";
 dotenv.config();
 
 export const getUserExpenses = async (req, res) => {
   try {
+    const { search, category } = req.query;
     const { authorization } = req.headers;
     const tokenDetails = JWT.verify(authorization, process.env.JWT_SECRET);
+    const whereClause = {
+      userId: tokenDetails.id,
+    };
+    if (search) {
+      whereClause.label = { [Op.like]: `%${search}%` };
+    }
+    if (category) {
+      whereClause.categoryId = category;
+    }
     const expenses = await Expense.findAll({
-      where: { userId: tokenDetails.id },
+      where: whereClause,
       include: [
         { model: User, as: "user", attributes: ["email"] },
         { model: Category, as: "category", attributes: ["name"] },
       ],
     });
+    expenses.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     res
       .status(HTTPStatus.success)
       .send({ success: true, message: "Fetch all expenses of user", expenses });
@@ -56,6 +69,52 @@ export const createExpense = async (req, res) => {
         message: "Invalid category, Try Again",
       });
     }
+    const categoriesBudget = await Budget.findOne({
+      where: { categoryId, userId: tokenDetails.id },
+    });
+    const expenses = await Expense.findAll({
+      where: { userId: tokenDetails.id, categoryId },
+    });
+    let totalCategoryAmount = 0;
+    expenses.forEach((expense) => {
+      totalCategoryAmount += Number(expense.amount);
+    });
+    console.log(
+      totalCategoryAmount,
+      Number(categoriesBudget.amount),
+      "heheheh"
+    );
+    if (
+      Number(totalCategoryAmount) + Number(amount) >
+      Number(categoriesBudget.amount)
+    ) {
+      await sendVerificationMail(
+        tokenDetails.email,
+        `You have exceed your budget limit by $${
+          Number(totalCategoryAmount) + Number(amount)
+        } where your budget is $${Number(categoriesBudget.amount)}`
+      );
+    } else if (
+      Number(totalCategoryAmount) + Number(amount) ==
+      Number(categoriesBudget.amount)
+    ) {
+      await sendVerificationMail(
+        tokenDetails.email,
+        `You have reached your budget limit by $${
+          Number(totalCategoryAmount) + Number(amount)
+        }`
+      );
+    } else if (
+      Number(totalCategoryAmount) + Number(amount) >
+      Number(categoriesBudget.amount) - 2000
+    ) {
+      await sendVerificationMail(
+        tokenDetails.email,
+        `You have come close to your budget limit by $${
+          Number(totalCategoryAmount) + Number(amount)
+        } where your budget is $${Number(categoriesBudget.amount)}`
+      );
+    }
     let expense;
     const currentDate = new Date();
     currentDate.setHours(0, 0, 0, 0);
@@ -66,7 +125,7 @@ export const createExpense = async (req, res) => {
           categoryId,
           userId: tokenDetails.id,
           isRecurring,
-          lastPay:currentDate
+          lastPay: currentDate,
         }))
       : (expense = await Expense.create({
           label,

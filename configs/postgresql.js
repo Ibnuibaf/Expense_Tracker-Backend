@@ -36,6 +36,8 @@ const connectDB = async () => {
     Collaborator=collaboratorModel(sequelize)
     Collaborator.belongsTo(User, { foreignKey: "userId", as: "user" });
     Collaborator.belongsTo(Expense, { foreignKey: "expenseId", as: "expense" });
+    Collaborator.belongsTo(Category, { foreignKey: "categoryId", as: "category" });
+    Collaborator.belongsTo(User, { foreignKey: "sharedBy", as: "sharedUser" });
     await sequelize.sync();
     console.log("Table created Successfuly");
   } catch (error) {

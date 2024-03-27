@@ -33,7 +33,7 @@ export const getUser = async (req, res) => {
 export const getAllUsers = async(req, res) => {
   try {
     const {search}=req.query
-    const users=await User.findAll({where: { email: { [Op.iLike]: search } }})
+    const users=search? await User.findAll({where: { email: { [Op.iLike]: search } }}):await User.findAll()
     res.status(HTTPStatus.success).send({success:true,message:"Fetch all users",users})
   } catch (error) {
     console.error(error);
