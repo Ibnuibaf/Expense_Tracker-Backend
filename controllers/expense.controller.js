@@ -2,7 +2,7 @@ import { HTTPStatus } from "../constants/StatusCode.js";
 import JWT from "jsonwebtoken";
 import dotenv from "dotenv";
 import { Budget, Category, Expense, User } from "../configs/postgresql.js";
-import sequelize,{ Op } from "sequelize";
+import sequelize, { Op } from "sequelize";
 import { sendVerificationMail } from "../utils/nodemailer.js";
 dotenv.config();
 
@@ -72,48 +72,50 @@ export const createExpense = async (req, res) => {
     const categoriesBudget = await Budget.findOne({
       where: { categoryId, userId: tokenDetails.id },
     });
-    const expenses = await Expense.findAll({
-      where: { userId: tokenDetails.id, categoryId },
-    });
-    let totalCategoryAmount = 0;
-    expenses.forEach((expense) => {
-      totalCategoryAmount += Number(expense.amount);
-    });
-    console.log(
-      totalCategoryAmount,
-      Number(categoriesBudget.amount),
-      "heheheh"
-    );
-    if (
-      Number(totalCategoryAmount) + Number(amount) >
-      Number(categoriesBudget.amount)
-    ) {
-      await sendVerificationMail(
-        tokenDetails.email,
-        `You have exceed your budget limit by $${
-          Number(totalCategoryAmount) + Number(amount)
-        } where your budget is $${Number(categoriesBudget.amount)}`
+    if (categoriesBudget) {
+      const expenses = await Expense.findAll({
+        where: { userId: tokenDetails.id, categoryId },
+      });
+      let totalCategoryAmount = 0;
+      expenses.forEach((expense) => {
+        totalCategoryAmount += Number(expense.amount);
+      });
+      console.log(
+        totalCategoryAmount,
+        Number(categoriesBudget.amount),
+        "heheheh"
       );
-    } else if (
-      Number(totalCategoryAmount) + Number(amount) ==
-      Number(categoriesBudget.amount)
-    ) {
-      await sendVerificationMail(
-        tokenDetails.email,
-        `You have reached your budget limit by $${
-          Number(totalCategoryAmount) + Number(amount)
-        }`
-      );
-    } else if (
-      Number(totalCategoryAmount) + Number(amount) >
-      Number(categoriesBudget.amount) - 2000
-    ) {
-      await sendVerificationMail(
-        tokenDetails.email,
-        `You have come close to your budget limit by $${
-          Number(totalCategoryAmount) + Number(amount)
-        } where your budget is $${Number(categoriesBudget.amount)}`
-      );
+      if (
+        Number(totalCategoryAmount) + Number(amount) >
+        Number(categoriesBudget.amount)
+      ) {
+        await sendVerificationMail(
+          tokenDetails.email,
+          `You have exceed your budget limit by $${
+            Number(totalCategoryAmount) + Number(amount)
+          } where your budget is $${Number(categoriesBudget.amount)}`
+        );
+      } else if (
+        Number(totalCategoryAmount) + Number(amount) ==
+        Number(categoriesBudget.amount)
+      ) {
+        await sendVerificationMail(
+          tokenDetails.email,
+          `You have reached your budget limit by $${
+            Number(totalCategoryAmount) + Number(amount)
+          }`
+        );
+      } else if (
+        Number(totalCategoryAmount) + Number(amount) >
+        Number(categoriesBudget.amount) - 2000
+      ) {
+        await sendVerificationMail(
+          tokenDetails.email,
+          `You have come close to your budget limit by $${
+            Number(totalCategoryAmount) + Number(amount)
+          } where your budget is $${Number(categoriesBudget.amount)}`
+        );
+      }
     }
     let expense;
     const currentDate = new Date();
@@ -180,7 +182,7 @@ export const recurringPayment = async (req, res) => {
   }
 };
 
-export const getExpensesByCategory = async (req,res) => {
+export const getExpensesByCategory = async (req, res) => {
   try {
     const { authorization } = req.headers;
     const tokenDetails = JWT.verify(authorization, process.env.JWT_SECRET);
@@ -194,15 +196,21 @@ export const getExpensesByCategory = async (req,res) => {
       },
       group: ["Expense.categoryId", "category.id", "category.name"],
       include: [
-        { model: Category, as: "category", attributes: [] } // Exclude unnecessary attributes
+        { model: Category, as: "category", attributes: [] }, // Exclude unnecessary attributes
       ],
     });
-    let totalExpenses=[]
-    expenses.forEach((expense)=>{
-      totalExpenses.push(expense.dataValues)
-    })
+    let totalExpenses = [];
+    expenses.forEach((expense) => {
+      totalExpenses.push(expense.dataValues);
+    });
     console.log(totalExpenses);
-    res.status(HTTPStatus.success).send({success:true,message:"Fetch the expense by category",totalExpenses})
+    res
+      .status(HTTPStatus.success)
+      .send({
+        success: true,
+        message: "Fetch the expense by category",
+        totalExpenses,
+      });
   } catch (error) {
     console.error(error);
     res
